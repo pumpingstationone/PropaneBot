@@ -25,7 +25,7 @@ func checkForCommands(input string) (bool, string) {
 	if matched {
 		sendResponse = true
 		mutex.Lock()
-		response = fmt.Sprintf("Well, as of %s the cylinder weighs %s which kinda translates into %s remaining", currentData.TimeStamp, currentData.Weight, currentData.Remaining)
+		response = fmt.Sprintf("Well, as of %s the cylinder weighs %s lbs which kinda translates into %s remaining", currentData.TimeStamp, currentData.Weight, currentData.Remaining)
 		mutex.Unlock()
 	}
 
