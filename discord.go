@@ -3,6 +3,7 @@ package main
 import (
 	"context"
 	"fmt"
+	"log"
 
 	"github.com/bwmarrin/discordgo"
 )
@@ -33,8 +34,9 @@ func (b *DiscordBot) Run(ctx context.Context) func() error {
 		if err := b.session.Open(); err != nil {
 			return err
 		}
-		defer func() { err = b.session.Close() }() 
+		defer func() { err = b.session.Close() }()
 		<-ctx.Done()
+		log.Printf("DiscordBot received Done with Error %q. Shutting down.\n", ctx.Err())
 		return err
 	}
 }

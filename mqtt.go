@@ -13,7 +13,9 @@ import (
 
 type MQTTListener struct {
 	Datastore *Datastore
+	// The MQTT server's name with port
 	Server    string
+	// The topic to listen on
 	Topic     string
 	// Cylinder  Cylinder
 }
@@ -57,8 +59,7 @@ func (l *MQTTListener) onMessageReceived(client MQTT.Client, message MQTT.Messag
 	)
 }
 
-// Initialize and start the MQTTListener. Takes a Context for cancellation, the MQTT server
-// name (with port), and the topic to subscribe to. It returns a function compatible with errgroup.Group.
+// Initialize and start the MQTTListener
 func (l *MQTTListener) Run(ctx context.Context) func() error {
 	return func() error {
 		hostname, _ := os.Hostname()
