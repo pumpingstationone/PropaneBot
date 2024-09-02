@@ -1,0 +1,14 @@
+{
+    "mqtt": {
+        "server": "",
+        "topic": ""
+    },
+    "slack": {
+        "apiToken": ""
+    },
+    "discord": {
+        "appToken": "",
+        "botToken": "",
+        "guildID": ""
+    }
+}
