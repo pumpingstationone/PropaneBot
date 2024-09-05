@@ -1,36 +1,26 @@
 package main
 
 import (
-	"fmt"
+	"context"
 	"log"
 	"os"
-	"os/signal"
 	"strconv"
 	"strings"
-	"sync"
-	"syscall"
 	"time"
 
 	MQTT "github.com/eclipse/paho.mqtt.golang"
 )
 
-type CurrentData struct {
-	Weight    string
-	TimeStamp string
-	// We'll calculate this when setting so the
-	// bot doesn't have to
-	Remaining string
+type MQTTListener struct {
+	Datastore *Datastore
+	// The MQTT server's name with port
+	Server    string
+	// The topic to listen on
+	Topic     string
+	// Cylinder  Cylinder
 }
 
-// We're not being fancy about this, we only care about the
-// current value, so we're just going to store it here so that
-// it's available when someone asks via the bot. We *do* guard
-// the writes though, we're not complete animals. :)
-var currentData CurrentData
-
-var mutex = &sync.Mutex{}
-
-func niceDate(unixts string) string {
+func (l *MQTTListener) niceDate(unixts string) time.Time {
 	i, err := strconv.ParseInt(unixts, 10, 64)
 	if err != nil {
 		panic(err)
@@ -43,53 +33,57 @@ func niceDate(unixts string) string {
 	if err == nil {
 		local = local.In(location)
 	}
-
-	return local.Format("Mon Jan _2 03:04PM 2006")
+	return local
 }
 
-func onMessageReceived(client MQTT.Client, message MQTT.Message) {
+func (l *MQTTListener) parseWeight(s string) float64 {
+	f, err := strconv.ParseFloat(s, 64)
+	if err != nil {
+		panic(err)
+	}
+	return f
+}
+
+func (l *MQTTListener) onMessageReceived(client MQTT.Client, message MQTT.Message) {
 	//fmt.Printf("Received message on topic: %s\nMessage: %s\n", message.Topic(), message.Payload())
 
 	// payload is in the format: 1577640142,163.4
 	payload := message.Payload()
 	parts := strings.Split(string(payload), ",")
+	weight := l.parseWeight(parts[1])
 
-	datePart := niceDate(parts[0])
-	weightPart := parts[1]
-	percentRemaining := calcRemaining(weightPart)
-
-	mutex.Lock()
-	currentData.Weight = weightPart
-	currentData.TimeStamp = datePart
-	currentData.Remaining = percentRemaining
-	mutex.Unlock()
+	l.Datastore.Set(
+		weight,
+		l.niceDate(parts[0]),
+		cylinder.CalcRemaining(weight),
+	)
 }
 
-func listenOnTopic() {
-	c := make(chan os.Signal, 1)
-	signal.Notify(c, os.Interrupt, syscall.SIGTERM)
+// Initialize and start the MQTTListener
+func (l *MQTTListener) Run(ctx context.Context) func() error {
+	return func() error {
+		hostname, _ := os.Hostname()
+		qos := 0
+		clientid := hostname
 
-	hostname, _ := os.Hostname()
+		connOpts := MQTT.NewClientOptions().AddBroker(l.Server).SetClientID(clientid).SetCleanSession(true)
 
-	server := "" // The mqtt server name (with port)
-	topic := ""  // Whatever the topic is
-	qos := 0
-	clientid := hostname
-
-	connOpts := MQTT.NewClientOptions().AddBroker(server).SetClientID(clientid).SetCleanSession(true)
-
-	connOpts.OnConnect = func(c MQTT.Client) {
-		if token := c.Subscribe(topic, byte(qos), onMessageReceived); token.Wait() && token.Error() != nil {
-			panic(token.Error())
+		connOpts.OnConnect = func(c MQTT.Client) {
+			if token := c.Subscribe(l.Topic, byte(qos), l.onMessageReceived); token.Wait() && token.Error() != nil {
+				panic(token.Error())
+			}
 		}
-	}
 
-	client := MQTT.NewClient(connOpts)
-	if token := client.Connect(); token.Wait() && token.Error() != nil {
-		panic(token.Error())
-	} else {
-		log.Printf("Connected to %s\n", server)
-	}
+		client := MQTT.NewClient(connOpts)
+		if token := client.Connect(); token.Wait() && token.Error() != nil {
+			panic(token.Error())
+		} else {
+			log.Printf("Connected to %s\n", l.Server)
+		}
 
-	<-c
+		<-ctx.Done()
+		log.Printf("MQTT received Done with Error %q. Shutting down.\n", ctx.Err().Error())
+
+		return nil
+	}
 }

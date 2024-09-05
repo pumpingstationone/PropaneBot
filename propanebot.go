@@ -1,82 +1,83 @@
 package main
 
 import (
-	"fmt"
+	"context"
+	"encoding/json"
+	"log"
 	"os"
-	"regexp"
-	"strings"
+	"os/signal"
+	"syscall"
 
-	"github.com/nlopes/slack"
+	"golang.org/x/sync/errgroup"
 )
 
-func getenv(name string) string {
-	v := os.Getenv(name)
-	if v == "" {
-		panic("missing required environment variable " + name)
-	}
-	return v
-}
+// func getenv(name string) string {
+// 	v := os.Getenv(name)
+// 	if v == "" {
+// 		panic("missing required environment variable " + name)
+// 	}
+// 	return v
+// }
 
-func checkForCommands(input string) (bool, string) {
-	response := ""
-	sendResponse := false
-
-	matched, _ := regexp.MatchString("!weight", input)
-	if matched {
-		sendResponse = true
-		mutex.Lock()
-		response = fmt.Sprintf("Well, as of %s the cylinder weighs %s lbs which kinda translates into %s remaining", currentData.TimeStamp, currentData.Weight, currentData.Remaining)
-		mutex.Unlock()
-	}
-
-	return sendResponse, response
+type AppConfig struct {
+	MQTT struct {
+		Server string `json:"server"`
+		Topic  string `json:"topic"`
+	} `json:"mqtt"`
+	Discord struct {
+		AppToken string `json:"appToken"`
+		GuildID  string `json:"guildId"`
+		BotToken string `json:"botToken"`
+	} `json:"discord"`
+	Slack struct {
+		APIToken string `json:"apiToken"`
+	} `json:"slack"`
 }
 
 func main() {
 	// Let's begin by reading the cylinder settings
-	loadCylinderData()
+	LoadCylinderData()
+
+	ds := NewDatastore()
+	var cfg AppConfig
+	if err := LoadConfig("./config.json", &cfg); err != nil {
+		panic("Failed to load config: " + err.Error())
+	}
+	// Get a Context that can handle stopping for signals, timeouts, or whatever else we throw at it
+	ctx, done := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
+	defer done()
+	wg, ctx := errgroup.WithContext(ctx)
 
 	// Now start the mqtt stuff so we can start getting messages
-	go listenOnTopic()
+	wg.Go((&MQTTListener{
+		Datastore: ds,
+		Server:    cfg.MQTT.Server,
+		Topic:     cfg.MQTT.Topic,
+	}).Run(ctx))
 
-	//
+	// Setup and run Discord
+	wg.Go((&DiscordBot{
+		AppToken:  cfg.Discord.AppToken,
+		GuildID:   cfg.Discord.GuildID,
+		BotToken:  cfg.Discord.BotToken,
+		Datastore: ds,
+	}).Run(ctx))
+
 	// Now begins the Slack stuff
-	//
-	token := "" // ToDo: Need the appropriate API token from Slack
-	api := slack.New(token)
-	rtm := api.NewRTM()
-	go rtm.ManageConnection()
+	wg.Go((&SlackBot{
+		APIToken:  cfg.Slack.APIToken,
+		Datastore: ds,
+	}).Run(ctx))
 
-Loop:
-	for {
-		select {
-		case msg := <-rtm.IncomingEvents:
-			switch ev := msg.Data.(type) {
-			case *slack.MessageEvent:
-				//info := rtm.GetInfo()
+	// Wait for exit and print any error messages that bubble up
+	log.Printf("Exiting with message: %q\n", wg.Wait())
+}
 
-				text := ev.Text
-				text = strings.TrimSpace(text)
-				text = strings.ToLower(text)
-
-				// Let's see if someone asked us for something...
-				sendResponse, response := checkForCommands(text)
-
-				if sendResponse {
-					// ...yep, we sent something back, so let's send it to the channel
-					rtm.SendMessage(rtm.NewOutgoingMessage(response, ev.Channel))
-				}
-
-			case *slack.RTMError:
-				fmt.Printf("Error: %s\n", ev.Error())
-
-			case *slack.InvalidAuthEvent:
-				fmt.Printf("Invalid credentials")
-				break Loop
-
-			default:
-				// Nothin' to do
-			}
-		}
+func LoadConfig(path string, cfg *AppConfig) error {
+	f, err := os.Open(path)
+	if err != nil {
+		return err
 	}
+	defer f.Close()
+	return json.NewDecoder(f).Decode(cfg)
 }
