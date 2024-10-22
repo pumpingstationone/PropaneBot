@@ -1,5 +1,5 @@
 {
-    "tareweight" : "68",
-    "fullweight" : "168",
-    "extraweight" : "6"
+    "tareweight" : 68.0,
+    "fullweight" : 168.0,
+    "extraweight" : 6.0
 }
