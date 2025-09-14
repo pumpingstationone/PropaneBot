@@ -69,6 +69,12 @@ func main() {
 		Datastore: ds,
 	}).Run(ctx))
 
+	// Start the web server on port 9991
+	wg.Go((&WebServer{
+		Port:      9991,
+		Datastore: ds,
+	}).Run(ctx))
+
 	// Wait for exit and print any error messages that bubble up
 	log.Printf("Exiting with message: %q\n", wg.Wait())
 }
