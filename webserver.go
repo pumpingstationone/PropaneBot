@@ -95,30 +95,58 @@ func (ws *WebServer) handleIndex(w http.ResponseWriter, r *http.Request) {
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>PropaneBot - Tank Level Monitor</title>
     <style>
+        * {
+            box-sizing: border-box;
+        }
         body {
-            font-family: Arial, sans-serif;
-            max-width: 800px;
-            margin: 0 auto;
-            padding: 20px;
-            background-color: #f5f5f5;
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            margin: 0;
+            padding: 0;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            display: flex;
+            align-items: center;
+            justify-content: center;
         }
         .container {
             background-color: white;
-            padding: 30px;
-            border-radius: 10px;
-            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+            border-radius: 15px;
+            box-shadow: 0 10px 30px rgba(0,0,0,0.2);
+            width: 95vw;
+            max-width: 800px;
+            min-height: 80vh;
+            display: flex;
+            flex-direction: column;
+            overflow: hidden;
         }
         .header {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            padding: 2rem;
             text-align: center;
-            color: #333;
-            margin-bottom: 30px;
+        }
+        .header h1 {
+            margin: 0 0 0.5rem 0;
+            font-size: clamp(1.5rem, 4vw, 2.5rem);
+        }
+        .header p {
+            margin: 0;
+            opacity: 0.9;
+            font-size: clamp(0.9rem, 2vw, 1.1rem);
+        }
+        .content {
+            flex: 1;
+            padding: 2rem;
+            display: flex;
+            flex-direction: column;
         }
         .status {
             background-color: #e8f4fd;
-            padding: 20px;
-            border-radius: 8px;
+            padding: 1rem 1.5rem;
+            border-radius: 10px;
             border-left: 4px solid #2196F3;
-            margin-bottom: 20px;
+            margin-bottom: 2rem;
+            font-size: clamp(0.9rem, 2vw, 1rem);
         }
         .status.error {
             background-color: #ffebee;
@@ -126,39 +154,48 @@ func (ws *WebServer) handleIndex(w http.ResponseWriter, r *http.Request) {
         }
         .data-display {
             display: grid;
-            grid-template-columns: 1fr 1fr 1fr;
-            gap: 20px;
-            margin: 20px 0;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 1.5rem;
+            margin: 2rem 0;
         }
         .data-item {
             text-align: center;
-            padding: 15px;
-            background-color: #f8f9fa;
-            border-radius: 8px;
+            padding: 1.5rem;
+            background: linear-gradient(145deg, #f8f9fa, #e9ecef);
+            border-radius: 15px;
+            box-shadow: 0 4px 15px rgba(0,0,0,0.1);
+            transition: transform 0.2s ease;
+        }
+        .data-item:hover {
+            transform: translateY(-2px);
         }
         .data-label {
-            font-size: 14px;
+            font-size: clamp(0.8rem, 1.5vw, 0.9rem);
             color: #666;
-            margin-bottom: 5px;
+            margin-bottom: 0.5rem;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
         }
         .data-value {
-            font-size: 24px;
+            font-size: clamp(1.5rem, 4vw, 2.5rem);
             font-weight: bold;
             color: #333;
+            margin-bottom: 0.25rem;
         }
-        .refresh-info {
-            text-align: center;
+        .data-unit {
+            font-size: clamp(0.7rem, 1.2vw, 0.8rem);
             color: #666;
-            font-size: 14px;
-            margin-top: 20px;
+        }
+        .progress-section {
+            margin: 2rem 0;
         }
         .progress-bar {
             width: 100%;
-            height: 30px;
+            height: clamp(40px, 6vw, 50px);
             background-color: #e0e0e0;
-            border-radius: 15px;
+            border-radius: 25px;
             overflow: hidden;
-            margin: 10px 0;
+            box-shadow: inset 0 2px 4px rgba(0,0,0,0.1);
         }
         .progress-fill {
             height: 100%;
@@ -169,6 +206,86 @@ func (ws *WebServer) handleIndex(w http.ResponseWriter, r *http.Request) {
             justify-content: center;
             color: white;
             font-weight: bold;
+            font-size: clamp(0.9rem, 2vw, 1.1rem);
+        }
+        .refresh-info {
+            text-align: center;
+            color: #666;
+            font-size: clamp(0.8rem, 1.5vw, 0.9rem);
+            margin-top: auto;
+            padding-top: 2rem;
+        }
+        
+        /* Mobile-specific adjustments */
+        @media (max-width: 768px) {
+            body {
+                background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+                align-items: flex-start;
+                padding: 1rem;
+            }
+            .container {
+                width: 100%;
+                min-height: calc(100vh - 2rem);
+                margin: 0;
+            }
+            .header {
+                padding: 1.5rem 1rem;
+            }
+            .content {
+                padding: 1.5rem;
+            }
+            .data-display {
+                grid-template-columns: 1fr;
+                gap: 1rem;
+            }
+            .data-item {
+                padding: 1rem;
+            }
+        }
+        
+        /* Tablet adjustments */
+        @media (min-width: 769px) and (max-width: 1024px) {
+            .container {
+                width: 90vw;
+                max-width: 700px;
+            }
+            .data-display {
+                grid-template-columns: repeat(2, 1fr);
+            }
+        }
+        
+        /* Large screen adjustments */
+        @media (min-width: 1200px) {
+            .container {
+                max-width: 900px;
+            }
+            .header {
+                padding: 3rem;
+            }
+            .content {
+                padding: 3rem;
+            }
+        }
+        
+        /* Landscape phone adjustments */
+        @media (max-height: 500px) and (orientation: landscape) {
+            body {
+                align-items: flex-start;
+                padding: 0.5rem;
+            }
+            .container {
+                min-height: calc(100vh - 1rem);
+            }
+            .header {
+                padding: 1rem;
+            }
+            .content {
+                padding: 1rem;
+            }
+            .data-display {
+                grid-template-columns: repeat(3, 1fr);
+                margin: 1rem 0;
+            }
         }
     </style>
 </head>
@@ -179,35 +296,40 @@ func (ws *WebServer) handleIndex(w http.ResponseWriter, r *http.Request) {
             <p>Real-time propane tank level monitoring</p>
         </div>
         
-        <div id="status" class="status">
-            <div id="message">Loading propane data...</div>
-        </div>
-        
-        <div class="data-display">
-            <div class="data-item">
-                <div class="data-label">Current Weight</div>
-                <div id="weight" class="data-value">--</div>
-                <div style="font-size: 12px; color: #666;">lbs</div>
+        <div class="content">
+            <div id="status" class="status">
+                <div id="message">Loading propane data...</div>
             </div>
-            <div class="data-item">
-                <div class="data-label">Remaining</div>
-                <div id="remaining" class="data-value">--</div>
-                <div style="font-size: 12px; color: #666;">%</div>
+            
+            <div class="data-display">
+                <div class="data-item">
+                    <div class="data-label">Current Weight</div>
+                    <div id="weight" class="data-value">--</div>
+                    <div class="data-unit">lbs</div>
+                </div>
+                <div class="data-item">
+                    <div class="data-label">Remaining</div>
+                    <div id="remaining" class="data-value">--</div>
+                    <div class="data-unit">%</div>
+                </div>
+                <div class="data-item">
+                    <div class="data-label">Last Updated</div>
+                    <div id="timestamp" class="data-value">--</div>
+                    <div class="data-unit"></div>
+                </div>
             </div>
-            <div class="data-item">
-                <div class="data-label">Last Updated</div>
-                <div id="timestamp" class="data-value">--</div>
+            
+            <div class="progress-section">
+                <div class="progress-bar">
+                    <div id="progress-fill" class="progress-fill" style="width: 0%;">
+                        0%
+                    </div>
+                </div>
             </div>
-        </div>
-        
-        <div class="progress-bar">
-            <div id="progress-fill" class="progress-fill" style="width: 0%;">
-                0%
+            
+            <div class="refresh-info">
+                Data refreshes automatically every 5 seconds
             </div>
-        </div>
-        
-        <div class="refresh-info">
-            Data refreshes automatically every 5 seconds
         </div>
     </div>
 
