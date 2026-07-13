@@ -46,7 +46,7 @@ func (pm *PropaneMonitor) Start(ctx context.Context) {
 			// Alert condition
 			if currentLevel < pm.alertThreshold {
 				if !alertSent {
-					message := fmt.Sprintf("Hey @tachoknight! The cylinder has dropped below %.0f%%! Current level: %.2f%%.\nMight wanna think about ordering a new one.", pm.alertThreshold, currentLevel)
+					message := fmt.Sprintf("Hey <@%s>! The cylinder has dropped below %.0f%%! Current level: %.2f%%.\nMight wanna think about ordering a new one.", pm.discordClient.UserID, pm.alertThreshold, currentLevel)
 
 					// Send notification to your specific Discord channel/user
 					err := pm.discordClient.SendMessage(message)

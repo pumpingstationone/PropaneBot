@@ -30,6 +30,7 @@ type AppConfig struct {
 		GuildID   string `json:"guildId"`
 		BotToken  string `json:"botToken"`
 		ChannelID string `json:"channelId"`
+		UserID    string `json:"userId"`
 	} `json:"discord"`
 	Slack struct {
 		APIToken string `json:"apiToken"`
@@ -71,6 +72,7 @@ func main() {
 		GuildID:   cfg.Discord.GuildID,
 		BotToken:  cfg.Discord.BotToken,
 		ChannelID: cfg.Discord.ChannelID,
+		UserID:    cfg.Discord.UserID,
 		Datastore: ds}
 	wg.Go(dc.Run(ctx))
 

@@ -17,6 +17,8 @@ type DiscordBot struct {
 	BotToken string
 	// Channel to post proactive alerts (e.g. low propane level) to
 	ChannelID string
+	// User to @-mention in proactive alerts (Discord numeric user ID)
+	UserID    string
 	Datastore *Datastore
 	session   *discordgo.Session
 }
