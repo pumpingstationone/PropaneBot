@@ -4,8 +4,8 @@ go 1.25.0
 
 require (
 	github.com/bwmarrin/discordgo v0.28.1
-	github.com/eclipse/paho.mqtt.golang v1.5.0
-	golang.org/x/sync v0.7.0
+	github.com/eclipse/paho.mqtt.golang v1.5.1
+	golang.org/x/sync v0.17.0
 )
 
 require (
