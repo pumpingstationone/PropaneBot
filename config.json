@@ -9,6 +9,8 @@
     "discord": {
         "appToken": "",
         "botToken": "",
-        "guildID": ""
+        "guildID": "",
+        "channelId": "",
+        "userId": ""
     }
 }
