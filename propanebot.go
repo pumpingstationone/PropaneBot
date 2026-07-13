@@ -7,6 +7,7 @@ import (
 	"os"
 	"os/signal"
 	"syscall"
+	"time"
 
 	"golang.org/x/sync/errgroup"
 )
@@ -25,13 +26,23 @@ type AppConfig struct {
 		Topic  string `json:"topic"`
 	} `json:"mqtt"`
 	Discord struct {
-		AppToken string `json:"appToken"`
-		GuildID  string `json:"guildId"`
-		BotToken string `json:"botToken"`
+		AppToken  string `json:"appToken"`
+		GuildID   string `json:"guildId"`
+		BotToken  string `json:"botToken"`
+		ChannelID string `json:"channelId"`
 	} `json:"discord"`
 	Slack struct {
 		APIToken string `json:"apiToken"`
 	} `json:"slack"`
+}
+
+func LoadConfig(path string, cfg *AppConfig) error {
+	f, err := os.Open(path)
+	if err != nil {
+		return err
+	}
+	defer f.Close()
+	return json.NewDecoder(f).Decode(cfg)
 }
 
 func main() {
@@ -56,18 +67,16 @@ func main() {
 	}).Run(ctx))
 
 	// Setup and run Discord
-	wg.Go((&DiscordBot{
-		AppToken:  cfg.Discord.AppToken,
+	dc := &DiscordBot{AppToken: cfg.Discord.AppToken,
 		GuildID:   cfg.Discord.GuildID,
 		BotToken:  cfg.Discord.BotToken,
-		Datastore: ds,
-	}).Run(ctx))
+		ChannelID: cfg.Discord.ChannelID,
+		Datastore: ds}
+	wg.Go(dc.Run(ctx))
 
-	// Now begins the Slack stuff
-	wg.Go((&SlackBot{
-		APIToken:  cfg.Slack.APIToken,
-		Datastore: ds,
-	}).Run(ctx))
+	// Setup and run the propane monitor that will send alerts to Discord when the level is low
+	monitor := NewPropaneMonitor(dc, ds, 10*time.Second)
+	go monitor.Start(ctx)
 
 	// Start the web server on port 9991
 	wg.Go((&WebServer{
@@ -77,13 +86,4 @@ func main() {
 
 	// Wait for exit and print any error messages that bubble up
 	log.Printf("Exiting with message: %q\n", wg.Wait())
-}
-
-func LoadConfig(path string, cfg *AppConfig) error {
-	f, err := os.Open(path)
-	if err != nil {
-		return err
-	}
-	defer f.Close()
-	return json.NewDecoder(f).Decode(cfg)
 }

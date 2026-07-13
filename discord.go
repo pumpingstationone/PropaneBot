@@ -14,9 +14,20 @@ type DiscordBot struct {
 	// Optional. Restricts bot to 1 server. Aka Server ID. In Discord, enable "Developer Mode", then right-click on the the server's icon
 	GuildID string
 	// From the Discord Developer Portal within an app
-	BotToken  string
+	BotToken string
+	// Channel to post proactive alerts (e.g. low propane level) to
+	ChannelID string
 	Datastore *Datastore
 	session   *discordgo.Session
+}
+
+// SendMessage posts a message to the bot's configured alert channel
+func (b *DiscordBot) SendMessage(message string) error {
+	if b.session == nil {
+		return fmt.Errorf("discord session is not running")
+	}
+	_, err := b.session.ChannelMessageSend(b.ChannelID, message)
+	return err
 }
 
 func (b *DiscordBot) Run(ctx context.Context) func() error {
