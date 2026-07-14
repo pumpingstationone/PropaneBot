@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"log"
 	"net/http"
+	"strconv"
 	"time"
 )
 
@@ -24,6 +25,9 @@ func (ws *WebServer) Run(ctx context.Context) func() error {
 
 		// JSON API endpoint for structured data
 		mux.HandleFunc("/api/propane", ws.handlePropaneJSON)
+
+		// Cylinder settings page: view/edit cylinder.json values
+		mux.HandleFunc("/cylinder", ws.handleCylinderSettings)
 
 		// Serve static files for the web page
 		mux.HandleFunc("/", ws.handleIndex)
@@ -80,6 +84,162 @@ func (ws *WebServer) handlePropaneJSON(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "Failed to encode JSON", http.StatusInternalServerError)
 		return
 	}
+}
+
+func (ws *WebServer) handleCylinderSettings(w http.ResponseWriter, r *http.Request) {
+	var errMsg string
+	var savedOK bool
+
+	if r.Method == http.MethodPost {
+		if err := r.ParseForm(); err != nil {
+			errMsg = "Failed to parse form data"
+		} else {
+			tare, tareErr := strconv.ParseFloat(r.FormValue("tareweight"), 64)
+			full, fullErr := strconv.ParseFloat(r.FormValue("fullweight"), 64)
+			extra, extraErr := strconv.ParseFloat(r.FormValue("extraweight"), 64)
+
+			if tareErr != nil || fullErr != nil || extraErr != nil {
+				errMsg = "All fields must be valid numbers (with decimal points!)"
+			} else {
+				c := Cylinder{TareWeight: tare, FullWeight: full, ExtraWeight: extra}
+				if err := SaveCylinderData(c); err != nil {
+					errMsg = fmt.Sprintf("Hmm, failed to save cylinder.json: %v", err)
+				} else {
+					savedOK = true
+				}
+			}
+		}
+	}
+
+	data := GetCylinderData()
+
+	var statusHTML string
+	if errMsg != "" {
+		statusHTML = fmt.Sprintf(`<div class="status error"><div>%s</div></div>`, errMsg)
+	} else if savedOK {
+		statusHTML = `<div class="status"><div>Whee! cylinder.json has been updated.</div></div>`
+	}
+
+	html := fmt.Sprintf(`<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Cylinder Settings</title>
+    <style>
+        * {
+            box-sizing: border-box;
+        }
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            margin: 0;
+            padding: 0;
+            background: linear-gradient(135deg, #667eea 0%%, #764ba2 100%%);
+            min-height: 100vh;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+        .container {
+            background-color: white;
+            border-radius: 15px;
+            box-shadow: 0 10px 30px rgba(0,0,0,0.2);
+            width: 95vw;
+            max-width: 500px;
+            overflow: hidden;
+        }
+        .header {
+            background: linear-gradient(135deg, #667eea 0%%, #764ba2 100%%);
+            color: white;
+            padding: 2rem;
+            text-align: center;
+        }
+        .header h1 {
+            margin: 0 0 0.5rem 0;
+            font-size: clamp(1.3rem, 4vw, 2rem);
+        }
+        .header p {
+            margin: 0;
+            opacity: 0.9;
+            font-size: clamp(0.85rem, 2vw, 1rem);
+        }
+        .content {
+            padding: 2rem;
+        }
+        .status {
+            background-color: #e8f4fd;
+            padding: 1rem 1.5rem;
+            border-radius: 10px;
+            border-left: 4px solid #2196F3;
+            margin-bottom: 1.5rem;
+            font-size: clamp(0.9rem, 2vw, 1rem);
+        }
+        .status.error {
+            background-color: #ffebee;
+            border-left-color: #f44336;
+        }
+        label {
+            display: block;
+            font-weight: bold;
+            color: #333;
+            margin-bottom: 0.4rem;
+            font-size: 0.95rem;
+        }
+        input[type="number"] {
+            width: 100%%;
+            padding: 0.75rem;
+            margin-bottom: 1.25rem;
+            border: 2px solid #e0e0e0;
+            border-radius: 8px;
+            font-size: 1rem;
+        }
+        input[type="number"]:focus {
+            outline: none;
+            border-color: #667eea;
+        }
+        button {
+            width: 100%%;
+            padding: 0.9rem;
+            border: none;
+            border-radius: 8px;
+            background: linear-gradient(45deg, #4CAF50, #8BC34A);
+            color: white;
+            font-size: 1rem;
+            font-weight: bold;
+            cursor: pointer;
+        }
+        button:hover {
+            opacity: 0.9;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>Cylinder Settings</h1>
+            <p>These are the values needed to calculate roughly how much gas is left in the cylinder.</p>
+        </div>
+        <div class="content">
+            %s
+            <form method="POST" action="/cylinder">
+                <label for="tareweight">Tare Weight (empty cylinder, lbs)</label>
+                <input type="number" step="any" id="tareweight" name="tareweight" value="%g" required>
+
+                <label for="fullweight">Full Weight (full cylinder, lbs)</label>
+                <input type="number" step="any" id="fullweight" name="fullweight" value="%g" required>
+
+                <label for="extraweight">Extra Weight (regulator, hose, chain, lbs)</label>
+                <input type="number" step="any" id="extraweight" name="extraweight" value="%g" required>
+
+                <button type="submit">Save</button>
+            </form>
+        </div>
+    </div>
+</body>
+</html>`, statusHTML, data.TareWeight, data.FullWeight, data.ExtraWeight)
+
+	w.Header().Set("Content-Type", "text/html")
+	fmt.Fprint(w, html)
 }
 
 func (ws *WebServer) handleIndex(w http.ResponseWriter, r *http.Request) {

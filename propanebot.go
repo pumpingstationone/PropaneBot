@@ -60,6 +60,10 @@ func main() {
 	defer done()
 	wg, ctx := errgroup.WithContext(ctx)
 
+	// Watch cylinder.json so edits (including from the web settings page)
+	// are picked up without restarting the bot
+	wg.Go(WatchCylinderData(ctx))
+
 	// Now start the mqtt stuff so we can start getting messages
 	wg.Go((&MQTTListener{
 		Datastore: ds,
