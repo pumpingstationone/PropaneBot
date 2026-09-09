@@ -65,16 +65,22 @@ func (ws *WebServer) handlePropaneText(w http.ResponseWriter, r *http.Request) {
 func (ws *WebServer) handlePropaneJSON(w http.ResponseWriter, r *http.Request) {
 	data := ws.Datastore.Get()
 
+	cylinderData := GetCylinderData()
+
 	response := struct {
 		Weight    float64   `json:"weight"`
 		TimeStamp time.Time `json:"timestamp"`
 		Remaining float64   `json:"remaining"`
 		Message   string    `json:"message"`
+		Cost      float64   `json:"cost"`
+		CostUsed  float64   `json:"costused"`
 	}{
 		Weight:    data.Weight,
 		TimeStamp: data.TimeStamp,
 		Remaining: data.Remaining,
 		Message:   ws.Datastore.GetString(),
+		Cost:      cylinderData.Cost,
+		CostUsed:  cylinderData.CalcCostUsed(data.Weight),
 	}
 
 	w.Header().Set("Content-Type", "application/json")
@@ -97,11 +103,12 @@ func (ws *WebServer) handleCylinderSettings(w http.ResponseWriter, r *http.Reque
 			tare, tareErr := strconv.ParseFloat(r.FormValue("tareweight"), 64)
 			full, fullErr := strconv.ParseFloat(r.FormValue("fullweight"), 64)
 			extra, extraErr := strconv.ParseFloat(r.FormValue("extraweight"), 64)
+			cost, costErr := strconv.ParseFloat(r.FormValue("cost"), 64)
 
-			if tareErr != nil || fullErr != nil || extraErr != nil {
+			if tareErr != nil || fullErr != nil || extraErr != nil || costErr != nil {
 				errMsg = "All fields must be valid numbers (with decimal points!)"
 			} else {
-				c := Cylinder{TareWeight: tare, FullWeight: full, ExtraWeight: extra}
+				c := Cylinder{TareWeight: tare, FullWeight: full, ExtraWeight: extra, Cost: cost}
 				if err := SaveCylinderData(c); err != nil {
 					errMsg = fmt.Sprintf("Hmm, failed to save cylinder.json: %v", err)
 				} else {
@@ -231,12 +238,15 @@ func (ws *WebServer) handleCylinderSettings(w http.ResponseWriter, r *http.Reque
                 <label for="extraweight">Extra Weight (regulator, hose, chain, lbs)</label>
                 <input type="number" step="any" id="extraweight" name="extraweight" value="%g" required>
 
+                <label for="cost">Cost (price paid for this cylinder, $)</label>
+                <input type="number" step="any" id="cost" name="cost" value="%g" required>
+
                 <button type="submit">Save</button>
             </form>
         </div>
     </div>
 </body>
-</html>`, statusHTML, data.TareWeight, data.FullWeight, data.ExtraWeight)
+</html>`, statusHTML, data.TareWeight, data.FullWeight, data.ExtraWeight, data.Cost)
 
 	w.Header().Set("Content-Type", "text/html")
 	fmt.Fprint(w, html)
@@ -477,6 +487,16 @@ func (ws *WebServer) handleIndex(w http.ResponseWriter, r *http.Request) {
                     <div id="timestamp" class="data-value">--</div>
                     <div class="data-unit"></div>
                 </div>
+                <div class="data-item">
+                    <div class="data-label">Cylinder Cost</div>
+                    <div id="cost" class="data-value">--</div>
+                    <div class="data-unit">paid for this cylinder</div>
+                </div>
+                <div class="data-item">
+                    <div class="data-label">Gas Used</div>
+                    <div id="costused" class="data-value">--</div>
+                    <div class="data-unit">value of propane used so far</div>
+                </div>
             </div>
             
             <div class="progress-section">
@@ -520,7 +540,11 @@ func (ws *WebServer) handleIndex(w http.ResponseWriter, r *http.Request) {
             const date = new Date(data.timestamp);
             const timeStr = date.toLocaleString();
             document.getElementById('timestamp').textContent = timeStr;
-            
+
+            // Update cost figures
+            document.getElementById('cost').textContent = '$' + data.cost.toFixed(2);
+            document.getElementById('costused').textContent = '$' + data.costused.toFixed(2);
+
             // Update progress bar
             const progressFill = document.getElementById('progress-fill');
             const percentage = Math.round(data.remaining);

@@ -26,6 +26,8 @@ type Cylinder struct {
 	// additional weight on the scale, like
 	// the regulator, hose, and safety chain
 	ExtraWeight float64 `json:"extraweight"`
+	// The price paid for the current cylinder of gas
+	Cost float64 `json:"cost"`
 }
 
 var (
@@ -137,4 +139,22 @@ func (c Cylinder) CalcRemaining(currentWeight float64) float64 {
 	delta := math.Round((adjusted / base) * 100)
 
 	return delta
+}
+
+// CalcCostUsed gives us a running dollar value of the gas used so far out
+// of the amount paid for the cylinder (Cost), based on the percentage of
+// gas remaining: as the weight drops toward empty, the cost of gas used
+// climbs toward the full Cost.
+func (c Cylinder) CalcCostUsed(currentWeight float64) float64 {
+	cur := GetCylinderData()
+
+	usedPct := 100 - c.CalcRemaining(currentWeight)
+	if usedPct < 0 {
+		usedPct = 0
+	}
+	if usedPct > 100 {
+		usedPct = 100
+	}
+
+	return math.Round((cur.Cost*usedPct/100)*100) / 100
 }
