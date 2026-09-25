@@ -12,8 +12,10 @@ docker run -d --name propanebot \
   --log-driver=local \
   --restart unless-stopped \
   --network host \
-  -v $(pwd)/config.json:/app/config.json:ro \
+  -v $(pwd)/config.json:/app/config.json \
   -v $(pwd)/cylinder.json:/app/cylinder.json \
   propanebot
 ```
 Note that the `--network host` option is required for the bot to be able to connect to the MQTT server and for the web server to be accessible on the local network. Also, make sure to adjust the paths to `config.json` and `cylinder.json` as needed.
+
+The bot stores `notificationSent` in `config.json` after sending a low-level alert. Keep this file writable by the container. To re-enable an alert while the level is below the threshold, check “Reset notification” on the cylinder settings page and save.

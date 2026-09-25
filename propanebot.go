@@ -6,6 +6,7 @@ import (
 	"log"
 	"os"
 	"os/signal"
+	"sync"
 	"syscall"
 	"time"
 
@@ -21,6 +22,8 @@ import (
 // }
 
 type AppConfig struct {
+	mu sync.Mutex `json:"-"`
+
 	MQTT struct {
 		Server string `json:"server"`
 		Topic  string `json:"topic"`
@@ -35,6 +38,25 @@ type AppConfig struct {
 	Slack struct {
 		APIToken string `json:"apiToken"`
 	} `json:"slack"`
+	NotificationSent bool `json:"notificationSent"`
+}
+
+func (cfg *AppConfig) HasSentNotification() bool {
+	cfg.mu.Lock()
+	defer cfg.mu.Unlock()
+	return cfg.NotificationSent
+}
+
+func (cfg *AppConfig) SetNotificationSent(path string, sent bool) error {
+	cfg.mu.Lock()
+	defer cfg.mu.Unlock()
+
+	cfg.NotificationSent = sent
+	data, err := json.MarshalIndent(cfg, "", "  ")
+	if err != nil {
+		return err
+	}
+	return os.WriteFile(path, data, 0600)
 }
 
 func LoadConfig(path string, cfg *AppConfig) error {
@@ -82,12 +104,16 @@ func main() {
 
 	// Setup and run the propane monitor that will send alerts to Discord when the level is low
 	monitor := NewPropaneMonitor(dc, ds, 10*time.Second)
+	monitor.Config = &cfg
+	monitor.ConfigPath = "./config.json"
 	go monitor.Start(ctx)
 
 	// Start the web server on port 9991
 	wg.Go((&WebServer{
-		Port:      9991,
-		Datastore: ds,
+		Port:       9991,
+		Datastore:  ds,
+		Config:     &cfg,
+		ConfigPath: "./config.json",
 	}).Run(ctx))
 
 	// Wait for exit and print any error messages that bubble up

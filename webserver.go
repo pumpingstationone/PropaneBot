@@ -11,9 +11,11 @@ import (
 )
 
 type WebServer struct {
-	Port      int
-	Datastore *Datastore
-	server    *http.Server
+	Port       int
+	Datastore  *Datastore
+	Config     *AppConfig
+	ConfigPath string
+	server     *http.Server
 }
 
 func (ws *WebServer) Run(ctx context.Context) func() error {
@@ -111,6 +113,14 @@ func (ws *WebServer) handleCylinderSettings(w http.ResponseWriter, r *http.Reque
 				c := Cylinder{TareWeight: tare, FullWeight: full, ExtraWeight: extra, Cost: cost}
 				if err := SaveCylinderData(c); err != nil {
 					errMsg = fmt.Sprintf("Hmm, failed to save cylinder.json: %v", err)
+				} else if r.FormValue("notify") == "notify" {
+					if ws.Config == nil {
+						errMsg = "Failed to reset notification: config is unavailable"
+					} else if err := ws.Config.SetNotificationSent(ws.ConfigPath, false); err != nil {
+						errMsg = fmt.Sprintf("Failed to reset notification in config.json: %v", err)
+					} else {
+						savedOK = true
+					}
 				} else {
 					savedOK = true
 				}
@@ -124,7 +134,11 @@ func (ws *WebServer) handleCylinderSettings(w http.ResponseWriter, r *http.Reque
 	if errMsg != "" {
 		statusHTML = fmt.Sprintf(`<div class="status error"><div>%s</div></div>`, errMsg)
 	} else if savedOK {
-		statusHTML = `<div class="status"><div>Whee! cylinder.json has been updated.</div></div>`
+		if r.FormValue("notify") == "notify" {
+			statusHTML = `<div class="status"><div>Settings saved and notification reset.</div></div>`
+		} else {
+			statusHTML = `<div class="status"><div>Whee! cylinder.json has been updated.</div></div>`
+		}
 	}
 
 	html := fmt.Sprintf(`<!DOCTYPE html>
@@ -240,6 +254,8 @@ func (ws *WebServer) handleCylinderSettings(w http.ResponseWriter, r *http.Reque
 
                 <label for="cost">Cost (price paid for this cylinder, $)</label>
                 <input type="number" step="any" id="cost" name="cost" value="%g" required>
+
+                <label><input type="checkbox" name="notify" value="notify"> Reset notification (send again if the level is below the alert threshold)</label>
 
                 <button type="submit">Save</button>
             </form>

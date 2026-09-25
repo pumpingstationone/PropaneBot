@@ -11,6 +11,8 @@ import (
 type PropaneMonitor struct {
 	discordClient  *DiscordBot // Your Discord bot/webhook client
 	datastore      *Datastore  // Component that reads the cylinder/propane value
+	Config         *AppConfig
+	ConfigPath     string
 	checkInterval  time.Duration
 	alertThreshold float64
 }
@@ -30,7 +32,6 @@ func (pm *PropaneMonitor) Start(ctx context.Context) {
 	defer ticker.Stop()
 
 	log.Println("Background propane monitor started...")
-	alertSent := false
 
 	for {
 		select {
@@ -45,7 +46,7 @@ func (pm *PropaneMonitor) Start(ctx context.Context) {
 
 			// Alert condition
 			if currentLevel < pm.alertThreshold {
-				if !alertSent {
+				if !pm.Config.HasSentNotification() {
 					message := fmt.Sprintf("Hey <@%s>! The cylinder has dropped below %.0f%%! Current level: %.2f%%.\nMight wanna think about ordering a new one.", pm.discordClient.UserID, pm.alertThreshold, currentLevel)
 
 					// Send notification to your specific Discord channel/user
@@ -54,14 +55,10 @@ func (pm *PropaneMonitor) Start(ctx context.Context) {
 						log.Printf("Failed to send Discord alert: %v\n", err)
 					} else {
 						log.Println("Discord alert sent successfully.")
-						alertSent = true
+						if err := pm.Config.SetNotificationSent(pm.ConfigPath, true); err != nil {
+							log.Printf("Failed to persist Discord notification state: %v\n", err)
+						}
 					}
-				}
-			} else {
-				// Reset the alert state once the tank is refilled above the threshold
-				if alertSent {
-					log.Println("Propane levels restored above threshold. Resetting alert trigger.")
-					alertSent = false
 				}
 			}
 		}
