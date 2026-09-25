@@ -37,7 +37,7 @@ func (d *Datastore) GetString() string {
 	defer d.lock.RUnlock()
 	return fmt.Sprintf(
 		"Well, as of %s the cylinder weighs %.0f lbs which kinda translates into %.0f%% remaining",
-		d.data.TimeStamp.Format("Mon Jan _2 03:04PM 2006"),
+		d.data.TimeStamp.Format("Mon Jan _2 2006 03:04PM"),
 		d.data.Weight,
 		d.data.Remaining,
 	)

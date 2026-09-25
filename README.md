@@ -6,12 +6,15 @@ This program monitors weight readings from an MQTT server and does three things:
 * A background thread monitors the weight and after it drops below a certain percentage will notify a specific user in a specific channel (set in `config.json`). This is meant to serve as a reminder to said person that maybe they should think about putting in a call to the gas supplier.
 
 ## How to run it as a container
+Run `./run-container.sh` to build the image and start the container with the settings below.
+
 ```
 docker build -t propane-bot .
 docker run -d --name propanebot \
   --log-driver=local \
   --restart unless-stopped \
   --network host \
+  --user "$(id -u):$(id -g)" \
   -v $(pwd)/config.json:/app/config.json \
   -v $(pwd)/cylinder.json:/app/cylinder.json \
   propanebot
